@@ -1,29 +1,69 @@
-// === Настройки и элементы ===
+// ===== BCG MATRIX with Supabase + Realtime =====
+
+// Пороги квадрантов (меняйте под свои правила)
+const SHARE_SPLIT = 1.0;   // вертикальная граница: относительная доля рынка
+const GROWTH_SPLIT = 10;   // горизонтальная граница: % роста рынка
+
 let products = [];
 let chart;
 
+// Удобные селекторы
 const els = {
-  form: () => document.getElementById('productForm'),
-  name: () => document.getElementById('productName'),
-  share: () => document.getElementById('marketShare'),
+  form:   () => document.getElementById('productForm'),
+  name:   () => document.getElementById('productName'),
+  share:  () => document.getElementById('marketShare'),
   growth: () => document.getElementById('marketGrowth'),
-  size: () => document.getElementById('productSize'),
-  list: () => document.getElementById('productsList'),
+  size:   () => document.getElementById('productSize'),
+  list:   () => document.getElementById('productsList'),
   canvas: () => document.getElementById('bcgChart'),
 };
 
-// Лог в угол, чтобы видеть ошибки без консоли (необязательно)
-function log(msg) {
-  let box = document.getElementById('appLog');
-  if (!box) {
-    box = document.createElement('div');
-    box.id = 'appLog';
-    box.style = 'position:fixed;right:8px;bottom:8px;background:#111;color:#fff;padding:8px 10px;border-radius:8px;font:12px system-ui;z-index:9999;opacity:.9';
-    document.body.appendChild(box);
+// Мини-лог в угол (помогает видеть ошибки без F12)
+function log(msg){ let b=document.getElementById('appLog'); if(!b){b=document.createElement('div');b.id='appLog';b.style='position:fixed;right:8px;bottom:8px;background:#111;color:#fff;padding:8px 10px;border-radius:8px;font:12px system-ui;z-index:9999;opacity:.9';document.body.appendChild(b);} b.textContent=String(msg); }
+function logErr(p,e){ console.error(p,e); log(`${p}: ${e?.message || e}`); }
+
+// === Плагин Chart.js: подложка квадрантов + линии + подписи ===
+const bcgQuadrants = {
+  id: 'bcgQuadrants',
+  beforeDraw(chart) {
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea) return;
+
+    const x = scales.x, y = scales.y;
+    const xSplit = x.getPixelForValue(SHARE_SPLIT);
+    const ySplit = y.getPixelForValue(GROWTH_SPLIT);
+
+    const quads = [
+      // Звёзды
+      { x0: chartArea.left,  y0: chartArea.top,    x1: xSplit,          y1: ySplit,           fill: 'rgba(255, 99, 132, 0.10)'},
+      // Дойные коровы
+      { x0: xSplit,          y0: chartArea.top,    x1: chartArea.right, y1: ySplit,           fill: 'rgba(255, 206, 86, 0.12)'},
+      // Трудные дети
+      { x0: chartArea.left,  y0: ySplit,           x1: xSplit,          y1: chartArea.bottom,  fill: 'rgba(75, 192, 192, 0.10)'},
+      // Собаки
+      { x0: xSplit,          y0: ySplit,           x1: chartArea.right, y1: chartArea.bottom, fill: 'rgba(201, 203, 207, 0.12)'}
+    ];
+
+    quads.forEach(q => { ctx.save(); ctx.fillStyle = q.fill; ctx.fillRect(q.x0, q.y0, q.x1-q.x0, q.y1-q.y0); ctx.restore(); });
+
+    // Разделительные линии
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(xSplit, chartArea.top);    ctx.lineTo(xSplit, chartArea.bottom); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(chartArea.left, ySplit);   ctx.lineTo(chartArea.right, ySplit);  ctx.stroke();
+    ctx.restore();
+
+    // Подписи квадрантов
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto';
+    ctx.fillText('Звёзды',        chartArea.left + 10, y.top + 14);
+    ctx.fillText('Дойные коровы', xSplit + 10,         y.top + 14);
+    ctx.fillText('Трудные дети',  chartArea.left + 10, ySplit + 14);
+    ctx.fillText('Собаки',        xSplit + 10,         ySplit + 14);
+    ctx.restore();
   }
-  box.textContent = String(msg);
-}
-function logErr(p, e) { console.error(p, e); log(`${p}: ${e?.message || e}`); }
+};
 
 // === Инициализация ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // === Обработчики ===
-function wireHandlers() {
+function wireHandlers(){
   const form = els.form();
   if (form) {
     form.addEventListener('submit', async (e) => {
@@ -44,31 +84,33 @@ function wireHandlers() {
   }
 }
 
-// === CRUD в Supabase ===
-async function loadProducts() {
+// === CRUD Supabase ===
+async function loadProducts(){
   const { data, error } = await supabase
     .from('products')
     .select('*')
     .order('id', { ascending: true });
-
   if (error) return logErr('Ошибка загрузки', error);
+
   products = data || [];
   renderList();
   renderChart();
   log('Данные загружены');
 }
 
-async function addProduct() {
+async function addProduct(){
   const name = (els.name()?.value || '').trim();
-  const marketShare = parseFloat(els.share()?.value);
+  const marketShare  = parseFloat(els.share()?.value);
   const marketGrowth = parseFloat(els.growth()?.value);
-  const size = parseFloat(els.size()?.value);
+  const size         = parseFloat(els.size()?.value);
 
   if (!name || isNaN(marketShare) || isNaN(marketGrowth) || isNaN(size)) {
     return log('Заполни все поля корректно');
   }
 
-  const { error } = await supabase.from('products').insert([{ name, marketShare, marketGrowth, size }]);
+  const { error } = await supabase
+    .from('products')
+    .insert([{ name, marketShare, marketGrowth, size }]);
   if (error) return logErr('Ошибка добавления', error);
 
   els.name().value = '';
@@ -77,27 +119,24 @@ async function addProduct() {
   els.size().value = '';
 }
 
-async function deleteProduct(id) {
+async function deleteProduct(id){
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) return logErr('Ошибка удаления', error);
 }
 
 // === Realtime ===
-function enableRealtime() {
+function enableRealtime(){
   supabase
     .channel('products-changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-      loadProducts();
-    })
+    .on('postgres_changes', { event:'*', schema:'public', table:'products' }, loadProducts)
     .subscribe();
 }
 
 // === Рендер списка ===
-function renderList() {
-  const box = els.list();
-  if (!box) return;
+function renderList(){
+  const box = els.list(); if (!box) return;
   box.innerHTML = '';
-  products.forEach((p) => {
+  products.forEach(p => {
     const row = document.createElement('div');
     row.className = 'product-item';
     row.innerHTML = `
@@ -109,55 +148,59 @@ function renderList() {
   });
 }
 
-// === Рендер BCG-матрицы (Chart.js Bubble) ===
-function renderChart() {
-  const ctx = els.canvas()?.getContext('2d');
-  if (!ctx) return;
+// === Рендер диаграммы (Chart.js Bubble) ===
+function renderChart(){
+  const ctx = els.canvas()?.getContext('2d'); if (!ctx) return;
 
-  // Преобразуем продукты -> точки пузырьковой диаграммы
-  const points = products.map((p) => ({
+  const points = products.map(p => ({
     label: p.name,
-    share: Number(p.marketShare),
-    growth: Number(p.marketGrowth),
-    size: Number(p.size),
-    r: Math.max(4, Math.sqrt(Math.max(0, Number(p.size))) * 0.8), // масштаб пузыря
+    x: Number(p.marketShare),
+    y: Number(p.marketGrowth),
+    r: Math.max(4, Math.sqrt(Math.max(0, Number(p.size))) * 0.8) // масштаб пузыря
   }));
 
-  const ds = points.map((pt) => ({
+  const datasets = points.map(pt => ({
     label: pt.label,
-    data: [{ x: pt.share, y: pt.growth, r: pt.r }],
+    data: [{ x: pt.x, y: pt.y, r: pt.r }]
   }));
 
-  // Освобождаем старый график
   if (chart) chart.destroy();
 
   chart = new Chart(ctx, {
     type: 'bubble',
-    data: { datasets: ds },
+    data: { datasets },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       scales: {
         x: {
           title: { display: true, text: 'Относительная доля рынка' },
-          min: 0, max: 2, grid: { color: 'rgba(0,0,0,.05)' }
+          min: 0, max: 2,   // подстройте под ваши данные
+          grid: { color: 'rgba(0,0,0,.05)' },
+          ticks: { callback: v => v === SHARE_SPLIT ? `${v} |` : v }
         },
         y: {
           title: { display: true, text: 'Темп роста рынка (%)' },
-          min: -10, max: 40, grid: { color: 'rgba(0,0,0,.05)' }
+          min: -10, max: 40, // подстройте под ваши данные
+          grid: { color: 'rgba(0,0,0,.05)' },
+          ticks: { callback: v => v === GROWTH_SPLIT ? `${v}% —` : v }
         }
       },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => {
-              const d = ctx.raw;
-              const name = ctx.dataset.label;
-              return `${name}: доля ${d.x}, рост ${d.y}%, размер ${Math.round(d.r**2 / 0.64)}`;
+            label: (c) => {
+              const d = c.raw;
+              const name = c.dataset.label;
+              // обратный расчёт размера (приблизительно) — для наглядности
+              const approxSize = Math.round((d.r ** 2) / 0.64);
+              return `${name}: доля ${d.x}, рост ${d.y}%, размер ~${approxSize}`;
             }
           }
         }
       }
-    }
+    },
+    plugins: [bcgQuadrants]
   });
 }
