@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бостонская матрица BCG</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Бостонская матрица BCG</h1>
+            <p class="subtitle">Анализ портфеля продуктов вашей компании</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Форма добавления продукта -->
+            <div class="input-section">
+                <h2>Добавить продукт</h2>
+                <form id="productForm">
+                    <div class="form-group">
+                        <label for="productName">Название продукта</label>
+                        <input type="text" id="productName" placeholder="Например: Продукт А" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="marketShare">Относительная доля рынка</label>
+                            <input type="number" id="marketShare" step="0.01" min="0" placeholder="0.5" required>
+                            <small>Доля вашей компании относительно конкурента</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="marketGrowth">Темп роста рынка (%)</label>
+                            <input type="number" id="marketGrowth" step="0.1" placeholder="15" required>
+                            <small>Годовой темп роста рынка в процентах</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productSize">Размер выручки (млн руб.)</label>
+                        <input type="number" id="productSize" step="0.1" min="0.1" placeholder="100" required>
+                        <small>Определяет размер точки на графике</small>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Добавить продукт</button>
+                </form>
+            </div>
+
+            <!-- График BCG матрицы -->
+            <div class="chart-section">
+                <h2>Матрица BCG</h2>
+                <div class="chart-container">
+                    <canvas id="bcgChart"></canvas>
+                </div>
+                <div class="legend-container">
+                    <div class="legend-item">
+                        <div class="legend-box" style="background: rgba(255, 99, 132, 0.7);"></div>
+                        <span><strong>Звезды</strong> - высокий рост, высокая доля</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box" style="background: rgba(255, 206, 86, 0.7);"></div>
+                        <span><strong>Дойные коровы</strong> - низкий рост, высокая доля</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box" style="background: rgba(75, 192, 192, 0.7);"></div>
+                        <span><strong>Трудные дети</strong> - высокий рост, низкая доля</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-box" style="background: rgba(201, 203, 207, 0.7);"></div>
+                        <span><strong>Собаки</strong> - низкий рост, низкая доля</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Список продуктов -->
+        <div class="products-list">
+            <h2>Список продуктов</h2>
+            <div id="productsList" class="products-grid"></div>
+        </div>
+    </div>
+
+    <script src="js/bcg.js"></script>
+</body>
+</html>
