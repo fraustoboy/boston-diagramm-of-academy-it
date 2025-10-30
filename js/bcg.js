@@ -1,100 +1,95 @@
-// Подключение Supabase — используется глобальная переменная supabase из index.html
+document.addEventListener('DOMContentLoaded', () => {
+  boot();
+});
 
 let products = [];
-const container = document.getElementById("productsList");
-const addButton = document.getElementById("addProductBtn");
-const nameInput = document.getElementById("productName");
-const shareInput = document.getElementById("marketShare");
-const growthInput = document.getElementById("marketGrowth");
-const sizeInput = document.getElementById("productSize");
+const els = {
+  list: () => document.getElementById('productsList'),
+  btn: () => document.getElementById('addProductBtn'),
+  name: () => document.getElementById('productName'),
+  share: () => document.getElementById('marketShare'),
+  growth: () => document.getElementById('marketGrowth'),
+  size: () => document.getElementById('productSize'),
+};
 
-// === Загрузка данных из Supabase ===
+async function boot() {
+  if (!window.supabase) { logErr('Supabase не инициализирован', 'Проверь порядок скриптов'); return; }
+  log('Загружаю данные…');
+  wireHandlers();
+  await loadProductsFromSupabase();
+  log('Готово');
+}
+
+function wireHandlers() {
+  const b = els.btn();
+  if (b) b.addEventListener('click', addProduct);
+}
+
 async function loadProductsFromSupabase() {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("id", { ascending: true });
-
-  if (error) {
-    console.error("Ошибка загрузки:", error);
-    return;
-  }
-
+  const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
+  if (error) { logErr('Ошибка загрузки', error); return; }
   products = data || [];
   renderProductsList();
   updateChart();
 }
 
-// === Добавление продукта ===
 async function addProduct() {
-  const name = nameInput.value.trim();
-  const marketShare = parseFloat(shareInput.value);
-  const marketGrowth = parseFloat(growthInput.value);
-  const size = parseFloat(sizeInput.value);
+  const name = (els.name()?.value || '').trim();
+  const marketShare = parseFloat(els.share()?.value);
+  const marketGrowth = parseFloat(els.growth()?.value);
+  const size = parseFloat(els.size()?.value);
 
   if (!name || isNaN(marketShare) || isNaN(marketGrowth) || isNaN(size)) {
-    alert("Пожалуйста, заполните все поля корректно.");
-    return;
+    log('Заполни все поля корректно'); return;
   }
+  const { error } = await supabase.from('products').insert([{ name, marketShare, marketGrowth, size }]);
+  if (error) { logErr('Ошибка добавления', error); return; }
 
-  const { error } = await supabase.from("products").insert([
-    { name, marketShare, marketGrowth, size },
-  ]);
-
-  if (error) {
-    console.error("Ошибка добавления:", error);
-    alert("Не удалось добавить продукт 😢");
-  } else {
-    nameInput.value = "";
-    shareInput.value = "";
-    growthInput.value = "";
-    sizeInput.value = "";
-  }
+  if (els.name()) els.name().value = '';
+  if (els.share()) els.share().value = '';
+  if (els.growth()) els.growth().value = '';
+  if (els.size()) els.size().value = '';
 }
 
-// === Удаление продукта ===
 async function deleteProduct(id) {
-  const { error } = await supabase.from("products").delete().eq("id", id);
-  if (error) {
-    console.error("Ошибка удаления:", error);
-  }
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) { logErr('Ошибка удаления', error); }
 }
 
-// === Отображение списка ===
 function renderProductsList() {
-  container.innerHTML = "";
+  const container = els.list();
+  if (!container) return;
+  container.innerHTML = '';
   products.forEach((p) => {
-    const div = document.createElement("div");
-    div.className = "product-item";
+    const div = document.createElement('div');
+    div.className = 'product-item';
     div.innerHTML = `
       <span>${p.name} — доля: ${p.marketShare}%, рост: ${p.marketGrowth}%, размер: ${p.size}</span>
-      <button onclick="deleteProduct(${p.id})">❌</button>
+      <button data-id="${p.id}">❌</button>
     `;
+    const btn = div.querySelector('button');
+    btn.addEventListener('click', () => deleteProduct(p.id));
     container.appendChild(div);
   });
 }
 
-// === Диаграмма (пример — просто консоль, если есть chart.js, можно вставить код сюда) ===
+// Если у тебя уже есть рисовалка матрицы — вставь её внутрь этой функции:
 function updateChart() {
-  console.log("Обновление данных:", products);
-  // Здесь вставь код для обновления диаграммы (если есть Chart.js или canvas)
+  if (typeof window.renderBCG === 'function') {
+    window.renderBCG(products); // вызов твоей существующей функции
+  } else {
+    // Временная заглушка: просто ничего не делаем
+  }
 }
 
-// === Реакция на клики ===
-addButton.addEventListener("click", addProduct);
-
-// === Реальное время (автообновление при изменениях у других пользователей) ===
+// Realtime обновления
 supabase
-  .channel("products-changes")
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "products" },
-    (payload) => {
-      console.log("Изменения в таблице:", payload);
-      loadProductsFromSupabase(); // перезагрузить данные
-    }
-  )
+  .channel('products-changes')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+    loadProductsFromSupabase();
+  })
   .subscribe();
 
-// === Первоначальная загрузка ===
-loadProductsFromSupabase();
+// мини-логгер
+function log(msg) { const b = document.getElementById('appLog'); if (b) b.textContent = String(msg); }
+function logErr(p, e) { console.error(p, e); const b = document.getElementById('appLog'); if (b) b.textContent = p + ': ' + (e?.message || e); }
