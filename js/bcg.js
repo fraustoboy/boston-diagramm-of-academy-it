@@ -1,36 +1,61 @@
-document.addEventListener('DOMContentLoaded', () => {
-  boot();
-});
-
+// === Настройки и элементы ===
 let products = [];
+let chart;
+
 const els = {
-  list: () => document.getElementById('productsList'),
-  btn: () => document.getElementById('addProductBtn'),
+  form: () => document.getElementById('productForm'),
   name: () => document.getElementById('productName'),
   share: () => document.getElementById('marketShare'),
   growth: () => document.getElementById('marketGrowth'),
   size: () => document.getElementById('productSize'),
+  list: () => document.getElementById('productsList'),
+  canvas: () => document.getElementById('bcgChart'),
 };
 
-async function boot() {
-  if (!window.supabase) { logErr('Supabase не инициализирован', 'Проверь порядок скриптов'); return; }
-  log('Загружаю данные…');
+// Лог в угол, чтобы видеть ошибки без консоли (необязательно)
+function log(msg) {
+  let box = document.getElementById('appLog');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'appLog';
+    box.style = 'position:fixed;right:8px;bottom:8px;background:#111;color:#fff;padding:8px 10px;border-radius:8px;font:12px system-ui;z-index:9999;opacity:.9';
+    document.body.appendChild(box);
+  }
+  box.textContent = String(msg);
+}
+function logErr(p, e) { console.error(p, e); log(`${p}: ${e?.message || e}`); }
+
+// === Инициализация ===
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window.supabase) { logErr('Supabase не инициализирован', 'проверь <script> в index.html'); return; }
   wireHandlers();
-  await loadProductsFromSupabase();
-  log('Готово');
-}
+  enableRealtime();
+  loadProducts();
+});
 
+// === Обработчики ===
 function wireHandlers() {
-  const b = els.btn();
-  if (b) b.addEventListener('click', addProduct);
+  const form = els.form();
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await addProduct();
+    });
+  }
 }
 
-async function loadProductsFromSupabase() {
-  const { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
-  if (error) { logErr('Ошибка загрузки', error); return; }
+// === CRUD в Supabase ===
+async function loadProducts() {
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .order('id', { ascending: true });
+
+  if (error) return logErr('Ошибка загрузки', error);
   products = data || [];
-  renderProductsList();
-  updateChart();
+  renderList();
+  renderChart();
+  log('Данные загружены');
 }
 
 async function addProduct() {
@@ -40,56 +65,99 @@ async function addProduct() {
   const size = parseFloat(els.size()?.value);
 
   if (!name || isNaN(marketShare) || isNaN(marketGrowth) || isNaN(size)) {
-    log('Заполни все поля корректно'); return;
+    return log('Заполни все поля корректно');
   }
-  const { error } = await supabase.from('products').insert([{ name, marketShare, marketGrowth, size }]);
-  if (error) { logErr('Ошибка добавления', error); return; }
 
-  if (els.name()) els.name().value = '';
-  if (els.share()) els.share().value = '';
-  if (els.growth()) els.growth().value = '';
-  if (els.size()) els.size().value = '';
+  const { error } = await supabase.from('products').insert([{ name, marketShare, marketGrowth, size }]);
+  if (error) return logErr('Ошибка добавления', error);
+
+  els.name().value = '';
+  els.share().value = '';
+  els.growth().value = '';
+  els.size().value = '';
 }
 
 async function deleteProduct(id) {
   const { error } = await supabase.from('products').delete().eq('id', id);
-  if (error) { logErr('Ошибка удаления', error); }
+  if (error) return logErr('Ошибка удаления', error);
 }
 
-function renderProductsList() {
-  const container = els.list();
-  if (!container) return;
-  container.innerHTML = '';
+// === Realtime ===
+function enableRealtime() {
+  supabase
+    .channel('products-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+      loadProducts();
+    })
+    .subscribe();
+}
+
+// === Рендер списка ===
+function renderList() {
+  const box = els.list();
+  if (!box) return;
+  box.innerHTML = '';
   products.forEach((p) => {
-    const div = document.createElement('div');
-    div.className = 'product-item';
-    div.innerHTML = `
-      <span>${p.name} — доля: ${p.marketShare}%, рост: ${p.marketGrowth}%, размер: ${p.size}</span>
-      <button data-id="${p.id}">❌</button>
+    const row = document.createElement('div');
+    row.className = 'product-item';
+    row.innerHTML = `
+      <span><strong>${p.name}</strong> — доля: ${p.marketShare}%, рост: ${p.marketGrowth}%, размер: ${p.size}</span>
+      <button class="del" data-id="${p.id}" title="Удалить">❌</button>
     `;
-    const btn = div.querySelector('button');
-    btn.addEventListener('click', () => deleteProduct(p.id));
-    container.appendChild(div);
+    row.querySelector('.del').addEventListener('click', () => deleteProduct(p.id));
+    box.appendChild(row);
   });
 }
 
-// Если у тебя уже есть рисовалка матрицы — вставь её внутрь этой функции:
-function updateChart() {
-  if (typeof window.renderBCG === 'function') {
-    window.renderBCG(products); // вызов твоей существующей функции
-  } else {
-    // Временная заглушка: просто ничего не делаем
-  }
+// === Рендер BCG-матрицы (Chart.js Bubble) ===
+function renderChart() {
+  const ctx = els.canvas()?.getContext('2d');
+  if (!ctx) return;
+
+  // Преобразуем продукты -> точки пузырьковой диаграммы
+  const points = products.map((p) => ({
+    label: p.name,
+    share: Number(p.marketShare),
+    growth: Number(p.marketGrowth),
+    size: Number(p.size),
+    r: Math.max(4, Math.sqrt(Math.max(0, Number(p.size))) * 0.8), // масштаб пузыря
+  }));
+
+  const ds = points.map((pt) => ({
+    label: pt.label,
+    data: [{ x: pt.share, y: pt.growth, r: pt.r }],
+  }));
+
+  // Освобождаем старый график
+  if (chart) chart.destroy();
+
+  chart = new Chart(ctx, {
+    type: 'bubble',
+    data: { datasets: ds },
+    options: {
+      responsive: true,
+      scales: {
+        x: {
+          title: { display: true, text: 'Относительная доля рынка' },
+          min: 0, max: 2, grid: { color: 'rgba(0,0,0,.05)' }
+        },
+        y: {
+          title: { display: true, text: 'Темп роста рынка (%)' },
+          min: -10, max: 40, grid: { color: 'rgba(0,0,0,.05)' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const d = ctx.raw;
+              const name = ctx.dataset.label;
+              return `${name}: доля ${d.x}, рост ${d.y}%, размер ${Math.round(d.r**2 / 0.64)}`;
+            }
+          }
+        }
+      }
+    }
+  });
 }
-
-// Realtime обновления
-supabase
-  .channel('products-changes')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
-    loadProductsFromSupabase();
-  })
-  .subscribe();
-
-// мини-логгер
-function log(msg) { const b = document.getElementById('appLog'); if (b) b.textContent = String(msg); }
-function logErr(p, e) { console.error(p, e); const b = document.getElementById('appLog'); if (b) b.textContent = p + ': ' + (e?.message || e); }
