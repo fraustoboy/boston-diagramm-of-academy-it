@@ -12,7 +12,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>📊 Бостонская матрица проодуктов Академии Софтлайн</h1>
+            <h1>📊 Бостонская матрица продуктов Академии Софтлайн</h1>
             <p class="subtitle">Анализ портфеля курсов</p>
         </header>
 
@@ -22,7 +22,7 @@
                 <h2>Добавить продукт</h2>
                 <form id="productForm">
                     <div class="form-group">
-                        <label for="productName">Название продукта</label>
+                        <label for="productName">Название курса или напрпавления</label>
                         <input type="text" id="productName" placeholder="Например: Продукт А" required>
                     </div>
                     
@@ -30,13 +30,13 @@
                         <div class="form-group">
                             <label for="marketShare">Относительная доля рынка</label>
                             <input type="number" id="marketShare" step="0.01" min="0" placeholder="0.5" required>
-                            <small>Доля вашей компании относительно конкурента</small>
+                            <small>Тут считаем долю продукта из всего портфеля (в продажах, конечно)</small>
                         </div>
                         
                         <div class="form-group">
-                            <label for="marketGrowth">Темп роста рынка (%)</label>
+                            <label for="marketGrowth">Темп роста продукта (%)</label>
                             <input type="number" id="marketGrowth" step="0.1" placeholder="15" required>
-                            <small>Годовой темп роста рынка в процентах</small>
+                            <small>Годовой темп роста продукта в процентах</small>
                         </div>
                     </div>
 
@@ -46,13 +46,13 @@
                         <small>Определяет размер точки на графике</small>
                     </div>
                     
-                    <button type="submit" class="btn-primary">Добавить продукт</button>
+                    <button type="submit" class="btn-primary">Добавить</button>
                 </form>
             </div>
 
             <!-- График BCG матрицы -->
             <div class="chart-section">
-                <h2>Матрица BCG</h2>
+                <h2>Бостонская матрица</h2>
                 <div class="chart-container">
                     <canvas id="bcgChart"></canvas>
                 </div>
