@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Бостонская матрица (BCG) — один файл</title>
+  <style>
+    :root { --bg:#f8fafc; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --brand:#2563eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; background:var(--bg); color:var(--text); }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    h1 { margin: 0 0 12px 0; }
+    .row { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 992px) { .row { grid-template-columns: 2fr 1fr; } }
+    .card { background:#fff; border:1px solid var(--border); border-radius:16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .card-header { padding:14px 16px; border-bottom:1px solid var(--border); font-weight:600; }
+    .card-body { padding:16px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:#fff; cursor:pointer; }
+    .btn.primary { background: var(--brand); color:#fff; border-color: var(--brand); }
+    .btn.danger { background:#ef4444; color:#fff; border-color:#ef4444; }
+    .btn.ghost { background:transparent; }
+    .btn:disabled { opacity:.6; cursor:not-allowed; }
+    .toolbar { display:flex; gap:8px; }
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .muted { color:var(--muted); font-size: 12px; }
+    .pill { display:inline-block; padding:4px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; background:#fff; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:8px; border-bottom:1px solid var(--border); text-align:left; vertical-align: middle; }
+    input[type="number"], input[type="text"] { width: 100%; padding:8px; border-radius:8px; border:1px solid var(--border); }
+    input[type="color"] { width: 44px; height: 36px; padding:0; border-radius:8px; border:1px solid var(--border); }
+    .hint { font-size:12px; color:#334155; background:#f1f5f9; border:1px solid var(--border); border-radius:12px; padding:10px; }
+    .legend { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:8px; margin-top:12px; }
+    @media (min-width: 768px) { .legend { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+    .legend-item { padding:10px; border-radius:12px; border:1px solid var(--border); background: #fff; }
+    .legend-item .title { font-weight:600; margin-bottom: 2px; }
+    .chart-wrap { height: 520px; width: 100%; }
+    .header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; }
+    .switch { width:44px; height:24px; }
+    .footer-note { font-size:12px; color:#475569; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React & Recharts via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+
+  <script>
+    const { useState, useEffect, useMemo } = React;
+    const {
+      ResponsiveContainer, ScatterChart, CartesianGrid, XAxis, YAxis, ZAxis,
+      Tooltip, Scatter, ReferenceLine, ReferenceArea, Legend
+    } = Recharts;
+
+    const STORAGE_KEY = "bcg-single-data-v1";
+    const SETTINGS_KEY = "bcg-single-settings-v1";
+
+    const defaultData = [
+      { id: "p1", name: "Alpha", x: 1.2, y: 12, z: 160, color: "#2563eb" },
+      { id: "p2", name: "Beta",  x: 0.6, y: 15, z: 120, color: "#16a34a" },
+      { id: "p3", name: "Gamma", x: 2.0, y: 3,  z: 220, color: "#f59e0b" },
+      { id: "p4", name: "Delta", x: 0.3, y: -2, z: 100, color: "#ef4444" },
+    ];
+
+    const palette = ["#2563eb","#16a34a","#f59e0b","#ef4444","#7c3aed","#0ea5e9","#f97316","#22d3ee"];
+
+    function median(nums){ if(!nums.length) return 0;
+      const arr=[...nums].sort((a,b)=>a-b); const mid=Math.floor(arr.length/2);
+      return arr.length % 2 ? arr[mid] : (arr[mid-1]+arr[mid])/2;
+    }
+
+    function classifyPoint(x,y,shareThr,growthThr){
+      const highShare = x >= shareThr;
+      const highGrowth = y >= growthThr;
+      if (highShare && highGrowth) return "Звезды";
+      if (!highShare && highGrowth) return "Трудные дети";
+      if (highShare && !highGrowth) return "Дойные коровы";
+      return "Собаки";
+    }
+
+    function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+
+    function App(){
+      const [rows, setRows] = useState(()=>{
+        try{ const saved=localStorage.getItem(STORAGE_KEY); return saved?JSON.parse(saved):defaultData; }catch{ return defaultData; }
+      });
+      const [autoThr, setAutoThr] = useState(()=>{
+        try{ const s=localStorage.getItem(SETTINGS_KEY); return s? (JSON.parse(s).autoThr ?? true) : true; }catch{ return true; }
+      });
+      const [shareThr, setShareThr] = useState(()=>{
+        try{ const s=localStorage.getItem(SETTINGS_KEY); return s? (JSON.parse(s).shareThr ?? 1):1; }catch{ return 1; }
+      });
+      const [growthThr, setGrowthThr] = useState(()=>{
+        try{ const s=localStorage.getItem(SETTINGS_KEY); return s? (JSON.parse(s).growthThr ?? 10):10; }catch{ return 10; }
+      });
+
+      useEffect(()=>{ localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); },[rows]);
+      useEffect(()=>{ localStorage.setItem(SETTINGS_KEY, JSON.stringify({autoThr,shareThr,growthThr})); },[autoThr,shareThr,growthThr]);
+
+      const autoShare = useMemo(()=> median(rows.map(r=>+r.x)), [rows]);
+      const autoGrowth = useMemo(()=> median(rows.map(r=>+r.y)), [rows]);
+
+      const xThr = autoThr ? autoShare : (+shareThr||0);
+      const yThr = autoThr ? autoGrowth : (+growthThr||0);
+
+      const xVals = rows.map(r=>+r.x); const yVals = rows.map(r=>+r.y);
+      const xMin = Math.min(...xVals, xThr), xMax = Math.max(...xVals, xThr);
+      const yMin = Math.min(...yVals, yThr), yMax = Math.max(...yVals, yThr);
+      const xPad = (xMax - xMin) * 0.1 || 1, yPad = (yMax - yMin) * 0.1 || 1;
+      const domainX = [xMin - xPad, xMax + xPad];
+      const domainY = [yMin - yPad, yMax + yPad];
+
+      const [draft, setDraft] = useState({ name: "Новый продукт", x: 1, y: 5, z: 140, color: palette[rows.length % palette.length] });
+
+      function addRow(){
+        if(!draft.name.trim()) return;
+        setRows(prev => [...prev, { id: uid(), name: draft.name.trim(), x:+draft.x||0, y:+draft.y||0, z: Math.max(40,+draft.z||100), color: draft.color || palette[prev.length%palette.length]} ]);
+        setDraft({ name:"Новый продукт", x:1, y:5, z:140, color: palette[(rows.length+1)%palette.length] });
+      }
+      function updateCell(id,key,val){ setRows(prev => prev.map(r => r.id===id ? {...r, [key]: key==="name" ? val : +val} : r)); }
+      function updateColor(id,color){ setRows(prev => prev.map(r => r.id===id ? {...r, color} : r)); }
+      function removeRow(id){ setRows(prev => prev.filter(r => r.id!==id)); }
+      function reset(){ setRows(defaultData); }
+      function clear(){ setRows([]); }
+
+      const quad = { stars:"#22c55e22", question:"#0ea5e922", cows:"#eab30822", dogs:"#ef444422" };
+
+      function TooltipContent({active,payload}){
+        if(active && payload && payload.length){
+          const p = payload[0].payload;
+          const cat = classifyPoint(p.x,p.y,xThr,yThr);
+          return React.createElement('div',{className:'pill',style:{background:'#fff'}},`${p.name} | X:${p.x} Y:${p.y}% | Z:${p.z} | ${cat}`);
+        }
+        return null;
+      }
+
+      return (
+        React.createElement('div',{className:'container'},
+          React.createElement('div',{className:'header'},
+            React.createElement('h1',null,'Бостонская матрица (BCG)'),
+            React.createElement('div',{className:'toolbar'},
+              React.createElement('button',{className:'btn',onClick:reset},'Загрузить пример'),
+              React.createElement('button',{className:'btn danger',onClick:clear},'Очистить всё')
+            )
+          ),
+          React.createElement('div',{className:'row'},
+            React.createElement('div',{className:'card'},
+              React.createElement('div',{className:'card-header'},'Матрица: X — относительная доля рынка; Y — темпы роста рынка'),
+              React.createElement('div',{className:'card-body'},
+                React.createElement('div',{className:'chart-wrap'},
+                  React.createElement(ResponsiveContainer,{width:'100%',height:'100%'},
+                    React.createElement(ScatterChart,{margin:{top:20,right:20,bottom:20,left:20}},
+                      React.createElement(CartesianGrid,{strokeDasharray:'3 3'}),
+                      React.createElement(XAxis,{type:'number',dataKey:'x',name:'Относительная доля рынка',domain:domainX,label:{value:'Относительная доля рынка (X)',position:'bottom',offset:0}}),
+                      React.createElement(YAxis,{type:'number',dataKey:'y',name:'Темпы роста рынка, %',domain:domainY,label:{value:'Темпы роста рынка (Y, %)',angle:-90,position:'insideLeft'}}),
+                      React.createElement(ZAxis,{type:'number',dataKey:'z',name:'Размер пузыря',range:[80,400]}),
+                      React.createElement(ReferenceArea,{x1:domainX[0],x2:xThr,y1:yThr,y2:domainY[1],fill:quad.stars}),
+                      React.createElement(ReferenceArea,{x1:xThr,x2:domainX[1],y1:yThr,y2:domainY[1],fill:quad.question}),
+                      React.createElement(ReferenceArea,{x1:domainX[0],x2:xThr,y1:domainY[0],y2:yThr,fill:quad.cows}),
+                      React.createElement(ReferenceArea,{x1:xThr,x2:domainX[1],y1:domainY[0],y2:yThr,fill:quad.dogs}),
+                      React.createElement(ReferenceLine,{x:xThr,stroke:'#334155',strokeDasharray:'4 4'}),
+                      React.createElement(ReferenceLine,{y:yThr,stroke:'#334155',strokeDasharray:'4 4'}),
+                      React.createElement(Tooltip,{cursor:{strokeDasharray:'4 4'},content:React.createElement(TooltipContent)}),
+                      React.createElement(Legend,null),
+                      rows.map(r=> React.createElement(Scatter,{key:r.id,name:r.name,data:[r],fill:r.color}))
+                    )
+                  )
+                ),
+                React.createElement('div',{className:'legend'},
+                  React.createElement('div',{className:'legend-item',style:{background:quad.stars}},
+                    React.createElement('div',{className:'title'},'Звезды'),
+                    React.createElement('div',{className:'muted'},'Высокая доля, высокий рост')
+                  ),
+                  React.createElement('div',{className:'legend-item',style:{background:quad.question}},
+                    React.createElement('div',{className:'title'},'Трудные дети'),
+                    React.createElement('div',{className:'muted'},'Низкая доля, высокий рост')
+                  ),
+                  React.createElement('div',{className:'legend-item',style:{background:quad.cows}},
+                    React.createElement('div',{className:'title'},'Дойные коровы'),
+                    React.createElement('div',{className:'muted'},'Высокая доля, низкий рост')
+                  ),
+                  React.createElement('div',{className:'legend-item',style:{background:quad.dogs}},
+                    React.createElement('div',{className:'title'},'Собаки'),
+                    React.createElement('div',{className:'muted'},'Низкая доля, низкий рост')
+                  )
+                )
+              )
+            ),
+            React.createElement('div',{className:'card'},
+              React.createElement('div',{className:'card-header'},'Пороговые значения'),
+              React.createElement('div',{className:'card-body'},
+                React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px',marginBottom:'8px'}},
+                  React.createElement('div',null,
+                    React.createElement('div',{style:{fontWeight:600}},'Автоматически по медиане'),
+                    React.createElement('div',{className:'muted'},'Порог X и Y берутся как медианы по текущим данным')
+                  ),
+                  React.createElement('input',{type:'checkbox',className:'switch',checked:autoThr,onChange:e=>setAutoThr(e.target.checked)})
+                ),
+                React.createElement('div',{className:'grid-2',style:{opacity:autoThr?0.6:1,pointerEvents:autoThr?'none':'auto'}},
+                  React.createElement('div',null,
+                    React.createElement('label',null,'Порог X (доля)'),
+                    React.createElement('input',{type:'number',step:'0.1',value:shareThr,onChange:e=>setShareThr(+e.target.value)})
+                  ),
+                  React.createElement('div',null,
+                    React.createElement('label',null,'Порог Y (рост, %)'),
+                    React.createElement('input',{type:'number',step:'0.1',value:growthThr,onChange:e=>setGrowthThr(+e.target.value)})
+                  )
+                ),
+                React.createElement('div',{className:'hint',style:{marginTop:'10px'}},
+                  React.createElement('div',{style:{fontWeight:600,marginBottom:'6px'}},'Текущие пороги'),
+                  React.createElement('div',null,'Доля X: ', React.createElement('b',null,xThr.toFixed(2))),
+                  React.createElement('div',null,'Рост Y: ', React.createElement('b',null,yThr.toFixed(2)),'%')
+                ),
+                React.createElement('div',{className:'hint',style:{marginTop:'10px'}},
+                  React.createElement('div',{style:{fontWeight:600,marginBottom:'6px'}},'Подсказки'),
+                  React.createElement('ul',null,
+                    React.createElement('li',null,'X — относительная доля рынка (≈1.0 — паритет с лидером).'),
+                    React.createElement('li',null,'Y — темпы роста рынка в процентах (можно отрицательные).'),
+                    React.createElement('li',null,'Z — размер пузыря (например, выручка/GMV/маржа).')
+                  )
+                )
+              )
+            )
+          ),
+          React.createElement('div',{className:'card',style:{marginTop:'16px'}},
+            React.createElement('div',{className:'card-header'},'Данные продуктов'),
+            React.createElement('div',{className:'card-body'},
+              React.createElement('div',{style:{overflowX:'auto'}},
+                React.createElement('table',null,
+                  React.createElement('thead',null,
+                    React.createElement('tr',null,
+                      React.createElement('th',null,'Название'),
+                      React.createElement('th',{title:'Относительная доля рынка'},'X'),
+                      React.createElement('th',{title:'Темпы роста рынка, %'},'Y, %'),
+                      React.createElement('th',{title:'Размер пузыря'},'Z'),
+                      React.createElement('th',null,'Цвет'),
+                      React.createElement('th',null,'Квадрант'),
+                      React.createElement('th',null,'Действия')
+                    )
+                  ),
+                  React.createElement('tbody',null,
+                    rows.map(r => React.createElement('tr',{key:r.id},
+                      React.createElement('td',null,
+                        React.createElement('input',{type:'text',value:r.name,onChange:e=>updateCell(r.id,'name',e.target.value)})
+                      ),
+                      React.createElement('td',null,
+                        React.createElement('input',{type:'number',step:'0.1',value:r.x,onChange:e=>updateCell(r.id,'x',e.target.value)})
+                      ),
+                      React.createElement('td',null,
+                        React.createElement('input',{type:'number',step:'0.1',value:r.y,onChange:e=>updateCell(r.id,'y',e.target.value)})
+                      ),
+                      React.createElement('td',null,
+                        React.createElement('input',{type:'number',step:'
