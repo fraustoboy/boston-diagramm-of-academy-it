@@ -18,7 +18,7 @@ const els = {
   canvas: () => document.getElementById('bcgChart'),
 };
 
-// Мини-лог в угол (помогает видеть ошибки без F12)
+// Мини-лог
 function log(msg){ let b=document.getElementById('appLog'); if(!b){b=document.createElement('div');b.id='appLog';b.style='position:fixed;right:8px;bottom:8px;background:#111;color:#fff;padding:8px 10px;border-radius:8px;font:12px system-ui;z-index:9999;opacity:.9';document.body.appendChild(b);} b.textContent=String(msg); }
 function logErr(p,e){ console.error(p,e); log(`${p}: ${e?.message || e}`); }
 
@@ -34,26 +34,22 @@ const bcgQuadrants = {
     const ySplit = y.getPixelForValue(GROWTH_SPLIT);
 
     const quads = [
-      // Звёзды
-      { x0: chartArea.left,  y0: chartArea.top,    x1: xSplit,          y1: ySplit,           fill: 'rgba(255, 99, 132, 0.10)'},
-      // Дойные коровы
-      { x0: xSplit,          y0: chartArea.top,    x1: chartArea.right, y1: ySplit,           fill: 'rgba(255, 206, 86, 0.12)'},
-      // Трудные дети
-      { x0: chartArea.left,  y0: ySplit,           x1: xSplit,          y1: chartArea.bottom,  fill: 'rgba(75, 192, 192, 0.10)'},
-      // Собаки
-      { x0: xSplit,          y0: ySplit,           x1: chartArea.right, y1: chartArea.bottom, fill: 'rgba(201, 203, 207, 0.12)'}
+      { x0: chartArea.left,  y0: chartArea.top,    x1: xSplit,          y1: ySplit,           fill: 'rgba(255, 99, 132, 0.10)'}, // Звёзды
+      { x0: xSplit,          y0: chartArea.top,    x1: chartArea.right, y1: ySplit,           fill: 'rgba(255, 206, 86, 0.12)'}, // Дойные коровы
+      { x0: chartArea.left,  y0: ySplit,           x1: xSplit,          y1: chartArea.bottom,  fill: 'rgba(75, 192, 192, 0.10)'}, // Трудные дети
+      { x0: xSplit,          y0: ySplit,           x1: chartArea.right, y1: chartArea.bottom, fill: 'rgba(201, 203, 207, 0.12)'}  // Собаки
     ];
 
     quads.forEach(q => { ctx.save(); ctx.fillStyle = q.fill; ctx.fillRect(q.x0, q.y0, q.x1-q.x0, q.y1-q.y0); ctx.restore(); });
 
-    // Разделительные линии
+    // Линии
     ctx.save();
     ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(xSplit, chartArea.top);    ctx.lineTo(xSplit, chartArea.bottom); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(chartArea.left, ySplit);   ctx.lineTo(chartArea.right, ySplit);  ctx.stroke();
     ctx.restore();
 
-    // Подписи квадрантов
+    // Подписи
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto';
@@ -175,13 +171,15 @@ function renderChart(){
       scales: {
         x: {
           title: { display: true, text: 'Относительная доля рынка' },
-          min: 0, max: 2,   // подстройте под ваши данные
+          min: 0, max: 2,
           grid: { color: 'rgba(0,0,0,.05)' },
           ticks: { callback: v => v === SHARE_SPLIT ? `${v} |` : v }
         },
         y: {
           title: { display: true, text: 'Темп роста рынка (%)' },
-          min: -10, max: 40, // подстройте под ваши данные
+          // >>> ИЗМЕНЕНО: полный диапазон -100% … 100%
+          min: -100,
+          max: 100,
           grid: { color: 'rgba(0,0,0,.05)' },
           ticks: { callback: v => v === GROWTH_SPLIT ? `${v}% —` : v }
         }
@@ -193,7 +191,6 @@ function renderChart(){
             label: (c) => {
               const d = c.raw;
               const name = c.dataset.label;
-              // обратный расчёт размера (приблизительно) — для наглядности
               const approxSize = Math.round((d.r ** 2) / 0.64);
               return `${name}: доля ${d.x}, рост ${d.y}%, размер ~${approxSize}`;
             }
