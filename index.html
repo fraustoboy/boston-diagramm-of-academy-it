@@ -30,20 +30,20 @@
                         <div class="form-group">
                             <label for="marketShare">Относительная доля портфеля</label>
                             <input type="number" id="marketShare" step="0.01" min="0" placeholder="0.5" required>
-                            <small>продажи продукта за период / продажи ведущего продукта за период (внутри своего направления)</small>
+                            <small>продажи продукта за период / продажи ведущего продукта за период (внутри своего направления за 25)</small>
                         </div>
                         
                         <div class="form-group">
                             <label for="marketGrowth">Темп роста продукта (%)</label>
                             <input type="number" id="marketGrowth" step="0.1" placeholder="15" required>
-                            <small>Годовой темп роста продукта в процентах (с 24 на 25)</small>
+                            <small>Рост направления в q1-q3 2025 относительно q1-q3 2024</small>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label for="productSize">Размер выручки (млн руб.)</label>
                         <input type="number" id="productSize" step="0.1" min="0.1" placeholder="100" required>
-                        <small>Как выросли с 2024 на 2025</small>
+                        <small>С 2024 в q1+q2+q3 на 2025 q1+q2+q3 какой рост произошел</small>
                     </div>
                     
                     <button type="submit" class="btn-primary">Добавить</button>
