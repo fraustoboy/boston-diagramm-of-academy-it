@@ -1,7 +1,7 @@
 // ===== BCG MATRIX with Supabase + Realtime =====
 
-// Пороги квадрантов (меняйте под свои правила)
-const SHARE_SPLIT = 1.0;   // вертикальная граница: относительная доля рынка
+// Пороги квадрантов
+const SHARE_SPLIT = 1.0;   // вертикальная граница: относительная доля рынка (можно поставить 0.5)
 const GROWTH_SPLIT = 10;   // горизонтальная граница: % роста рынка
 
 let products = [];
@@ -34,10 +34,10 @@ const bcgQuadrants = {
     const ySplit = y.getPixelForValue(GROWTH_SPLIT);
 
     const quads = [
-      { x0: chartArea.left,  y0: chartArea.top,    x1: xSplit,          y1: ySplit,           fill: 'rgba(255, 99, 132, 0.10)'}, // Звёзды
-      { x0: xSplit,          y0: chartArea.top,    x1: chartArea.right, y1: ySplit,           fill: 'rgba(255, 206, 86, 0.12)'}, // Дойные коровы
+      { x0: chartArea.left,  y0: chartArea.top,    x1: xSplit,          y1: ySplit,            fill: 'rgba(255, 99, 132, 0.10)'}, // Звёзды
+      { x0: xSplit,          y0: chartArea.top,    x1: chartArea.right, y1: ySplit,            fill: 'rgba(255, 206, 86, 0.12)'}, // Дойные коровы
       { x0: chartArea.left,  y0: ySplit,           x1: xSplit,          y1: chartArea.bottom,  fill: 'rgba(75, 192, 192, 0.10)'}, // Трудные дети
-      { x0: xSplit,          y0: ySplit,           x1: chartArea.right, y1: chartArea.bottom, fill: 'rgba(201, 203, 207, 0.12)'}  // Собаки
+      { x0: xSplit,          y0: ySplit,           x1: chartArea.right, y1: chartArea.bottom,  fill: 'rgba(201, 203, 207, 0.12)'}  // Собаки
     ];
 
     quads.forEach(q => { ctx.save(); ctx.fillStyle = q.fill; ctx.fillRect(q.x0, q.y0, q.x1-q.x0, q.y1-q.y0); ctx.restore(); });
@@ -49,7 +49,7 @@ const bcgQuadrants = {
     ctx.beginPath(); ctx.moveTo(chartArea.left, ySplit);   ctx.lineTo(chartArea.right, ySplit);  ctx.stroke();
     ctx.restore();
 
-    // Подписи
+    // Подписи квадрантов
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto';
@@ -136,7 +136,7 @@ function renderList(){
     const row = document.createElement('div');
     row.className = 'product-item';
     row.innerHTML = `
-      <span><strong>${p.name}</strong> — доля: ${p.marketShare}%, рост: ${p.marketGrowth}%, размер: ${p.size}</span>
+      <span><strong>${p.name}</strong> — доля: ${p.marketShare}, рост: ${p.marketGrowth}%, размер: ${p.size}</span>
       <button class="del" data-id="${p.id}" title="Удалить">❌</button>
     `;
     row.querySelector('.del').addEventListener('click', () => deleteProduct(p.id));
@@ -150,8 +150,8 @@ function renderChart(){
 
   const points = products.map(p => ({
     label: p.name,
-    x: Number(p.marketShare),
-    y: Number(p.marketGrowth),
+    x: Number(p.marketShare),   // ожидаем 0…1 (относительная доля)
+    y: Number(p.marketGrowth),  // ожидаем −100…100 (% роста)
     r: Math.max(4, Math.sqrt(Math.max(0, Number(p.size))) * 0.8) // масштаб пузыря
   }));
 
@@ -170,18 +170,18 @@ function renderChart(){
       maintainAspectRatio: false,
       scales: {
         x: {
-          title: { display: true, text: 'Относительная доля рынка' },
-          min: 0, max: 2,
+          title: { display: true, text: 'Относительная доля рынка (0…1)' },
+          min: 0,
+          max: 1,                          // <<< ИЗМЕНЕНО: диапазон X 0…1
           grid: { color: 'rgba(0,0,0,.05)' },
-          ticks: { callback: v => v === SHARE_SPLIT ? `${v} |` : v }
+          ticks: { stepSize: 0.1 }
         },
         y: {
           title: { display: true, text: 'Темп роста рынка (%)' },
-          // >>> ИЗМЕНЕНО: полный диапазон -100% … 100%
           min: -100,
           max: 100,
           grid: { color: 'rgba(0,0,0,.05)' },
-          ticks: { callback: v => v === GROWTH_SPLIT ? `${v}% —` : v }
+          ticks: { stepSize: 10, callback: (v) => `${v}%` }
         }
       },
       plugins: {
