@@ -179,7 +179,8 @@ function renderChart(){
     label: p.name,
     x: Number(p.marketShare),   // 0..1
     y: Number(p.marketGrowth),  // -100..100
-    r: Math.max(4, Math.sqrt(Math.max(0, Number(p.size))) * 0.8)
+    r: Math.max(4, Math.sqrt(Math.max(0, Number(p.size))) * 0.8),
+    size: Number(p.size)
   }));
 
   const datasets = points.map(pt => ({
@@ -214,12 +215,9 @@ function renderChart(){
         tooltip: {
           callbacks: {
             label: (c) => {
-              const d = c.raw;
+              const d = c.raw;                // { x, y, r, size }
               const name = c.dataset.label;
-              const hasReal = Number.isFinite(d.size);
-              const approxSize = Math.round((d.r ** 2) / 0.64);
-              const sizeText = hasReal ? d.size : (d.r <= 4 ? '≤25' : `~${approxSize}`);
-              return `${name}: доля ${d.x}, рост ${d.y}%, размер ${sizeText}`;
+              return `${name}: доля ${d.x}, рост ${d.y}%, размер ${d.size}`;
             }
           }
         }
