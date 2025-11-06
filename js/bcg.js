@@ -184,7 +184,7 @@ function renderChart(){
 
   const datasets = points.map(pt => ({
     label: pt.label,
-    data: [{ x: pt.x, y: pt.y, r: pt.r }]
+    data: [{ x: pt.x, y: pt.y, r: pt.r, size: pt.size }]
   }));
 
   if (chart) chart.destroy();
@@ -216,8 +216,10 @@ function renderChart(){
             label: (c) => {
               const d = c.raw;
               const name = c.dataset.label;
+              const hasReal = Number.isFinite(d.size);
               const approxSize = Math.round((d.r ** 2) / 0.64);
-              return `${name}: доля ${d.x}, рост ${d.y}%, размер ~${approxSize}`;
+              const sizeText = hasReal ? d.size : (d.r <= 4 ? '≤25' : `~${approxSize}`);
+              return `${name}: доля ${d.x}, рост ${d.y}%, размер ${sizeText}`;
             }
           }
         }
