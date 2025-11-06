@@ -1,98 +1,170 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Бостонская матрица BCG</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Бостонская матрица BCG</title>
+
+  <link rel="stylesheet" href="css/style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>📊 Бостонская матрица продуктов Академии Софтлайн</h1>
-            <p class="subtitle">Анализ портфеля курсов</p>
-        </header>
+  <div class="container">
+    <header>
+      <!-- Эти элементы будут подменяться по PAGE_SLUG -->
+      <h1 id="page-title">📊 Бостонская матрица продуктов Академии Софтлайн</h1>
+      <p class="subtitle" id="page-subtitle">Анализ портфеля курсов</p>
 
-        <div class="main-content">
-            <!-- Форма добавления продукта -->
-            <div class="input-section">
-                <h2>Добавить продукт</h2>
-                <form id="productForm">
-                    <div class="form-group">
-                        <label for="productName">Название курса или направления</label>
-                        <input type="text" id="productName" placeholder="Например: Продукт А" required>
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="marketShare">Относительная доля портфеля</label>
-                            <input type="number" id="marketShare" step="0.01" min="0" placeholder="0.5" required>
-                            <small>продажи продукта за период / продажи ведущего продукта за период (внутри своего направления за 25)</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="marketGrowth">Темп роста продукта (%)</label>
-                            <input type="number" id="marketGrowth" step="0.1" placeholder="15" required>
-                            <small>Рост направления в q1-q3 2025 относительно q1-q3 2024</small>
-                        </div>
-                    </div>
+      <!-- Простая навигация по 5 страницам -->
+      <nav class="pages-nav" style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="?page=page1">ИКТ</a>
+        <a href="?page=page2">ИБ</a>
+        <a href="?page=page3">Лаборатория ЦТ</a>
+        <a href="?page=page4">Программирование</a>
+        <a href="?page=page5">Прочее (Заказное ИКТ + СДТО)</a>
+      </nav>
+    </header>
 
-                    <div class="form-group">
-                        <label for="productSize">Размер выручки (млн руб.)</label>
-                        <input type="number" id="productSize" step="0.1" min="0.1" placeholder="100" required>
-                        <small>На q3 2025</small>
-                    </div>
-                    
-                    <button type="submit" class="btn-primary">Добавить</button>
-                </form>
+    <!-- Дополнительный вводный блок для каждого раздела -->
+    <section class="intro" style="margin: 12px 0 20px;">
+      <div id="page-intro"></div>
+    </section>
+
+    <div class="main-content">
+      <!-- Форма добавления продукта -->
+      <div class="input-section">
+        <h2>Добавить продукт</h2>
+        <form id="productForm">
+          <div class="form-group">
+            <label for="productName">Название курса или направления</label>
+            <input type="text" id="productName" placeholder="Например: Продукт А" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="marketShare">Относительная доля портфеля</label>
+              <input type="number" id="marketShare" step="0.01" min="0" placeholder="0.5" required />
+              <small>продажи продукта за период / продажи ведущего продукта за период (внутри своего направления)</small>
             </div>
 
-            <!-- График BCG матрицы -->
-            <div class="chart-section">
-                <h2>Бостонская матрица</h2>
-                <div class="chart-container">
-                    <canvas id="bcgChart"></canvas>
-                </div>
-                <div class="legend-container">
-                    <div class="legend-item">
-                        <div class="legend-box" style="background: rgba(255, 99, 132, 0.7);"></div>
-                        <span><strong>Звезды</strong> - высокий рост, высокая доля</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-box" style="background: rgba(255, 206, 86, 0.7);"></div>
-                        <span><strong>Дойные коровы</strong> - низкий рост, высокая доля</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-box" style="background: rgba(75, 192, 192, 0.7);"></div>
-                        <span><strong>Трудные дети</strong> - высокий рост, низкая доля</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-box" style="background: rgba(201, 203, 207, 0.7);"></div>
-                        <span><strong>Собаки</strong> - низкий рост, низкая доля</span>
-                    </div>
-                </div>
+            <div class="form-group">
+              <label for="marketGrowth">Темп роста продукта (%)</label>
+              <input type="number" id="marketGrowth" step="0.1" placeholder="15" required />
+              <small>Рост направления в q1–q3 2025 относительно q1–q3 2024</small>
             </div>
+          </div>
+
+          <div class="form-group">
+            <label for="productSize">Размер выручки (млн руб.)</label>
+            <input type="number" id="productSize" step="0.1" min="0.1" placeholder="100" required />
+            <small>На q3 2025</small>
+          </div>
+
+          <button type="submit" class="btn-primary">Добавить</button>
+        </form>
+      </div>
+
+      <!-- График BCG -->
+      <div class="chart-section">
+        <h2>Бостонская матрица</h2>
+        <div class="chart-container">
+          <canvas id="bcgChart"></canvas>
         </div>
 
-        <!-- Список продуктов -->
-        <div class="products-list">
-            <h2>Список продуктов</h2>
-            <div id="productsList" class="products-grid"></div>
+        <div class="legend-container">
+          <div class="legend-item">
+            <div class="legend-box" style="background: rgba(255, 99, 132, 0.7);"></div>
+            <span><strong>Звезды</strong> — высокий рост, высокая доля</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: rgba(255, 206, 86, 0.7);"></div>
+            <span><strong>Дойные коровы</strong> — низкий рост, высокая доля</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: rgba(75, 192, 192, 0.7);"></div>
+            <span><strong>Трудные дети</strong> — высокий рост, низкая доля</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: rgba(201, 203, 207, 0.7);"></div>
+            <span><strong>Собаки</strong> — низкий рост, низкая доля</span>
+          </div>
         </div>
+      </div>
     </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const SUPABASE_URL = 'https://dbaqjqryolyctmqrjsux.supabase.co';
-  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiYXFqcXJ5b2x5Y3RtcXJqc3V4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MTI0NzEsImV4cCI6MjA3NzM4ODQ3MX0._YpTi4RZAAmKbRjY-VaU-Av_yISdBvTcA4NYRml9_nA';
-  window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-</script>
-    <script>
-  // Берём ?page=... из адресной строки. Если нет — page1
-  window.PAGE_SLUG = new URLSearchParams(location.search).get('page') || 'page1';
-</script>
-<script src="js/bcg.js"></script>
+
+    <!-- Список продуктов -->
+    <div class="products-list">
+      <h2>Список продуктов</h2>
+      <div id="productsList" class="products-grid"></div>
+    </div>
+  </div>
+
+  <!-- Supabase (оставляем как было) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://dbaqjqryolyctmqrjsux.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRiYXFqcXJ5b2x5Y3RtcXJqc3V4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4MTI0NzEsImV4cCI6MjA3NzM4ODQ3MX0._YpTi4RZAAmKbRjY-VaU-Av_yISdBvTcA4NYRml9_nA';
+    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  </script>
+
+  <!-- Страница → тексты и слаг -->
+  <script>
+    // 1) берём ?page=page1..page5; по умолчанию page1
+    window.PAGE_SLUG = new URLSearchParams(location.search).get('page') || 'page1';
+
+    // 2) тексты для пяти страниц (редактируйте при необходимости)
+    const PAGE_CONTENT = {
+      page1: {
+        title: 'ИКТ — Бостонская матрица',
+        subtitle: 'Направление: ИКТ',
+        introHtml: '<p>На этой странице вы ведёте продукты направления <strong>ИКТ</strong>.</p>'
+      },
+      page2: {
+        title: 'ИБ — Бостонская матрица',
+        subtitle: 'Направление: Информационная безопасность',
+        introHtml: '<p>На этой странице вы ведёте продукты направления <strong>ИБ</strong>.</p>'
+      },
+      page3: {
+        title: 'Лаборатория ЦТ — Бостонская матрица',
+        subtitle: 'Направление: Лаборатория цифровых технологий',
+        introHtml: '<p>На этой странице вы ведёте продукты <strong>Лаборатории ЦТ</strong>.</p>'
+      },
+      page4: {
+        title: 'Программирование — Бостонская матрица',
+        subtitle: 'Направление: Программирование',
+        introHtml: '<p>На этой странице вы ведёте продукты направления <strong>Программирование</strong>.</p>'
+      },
+      page5: {
+        title: 'Прочее (Заказное ИКТ + СДТО) — Бостонская матрица',
+        subtitle: 'Направление: Прочее',
+        introHtml: '<p>На этой странице вы ведёте продукты категории <strong>Прочее</strong> (Заказное ИКТ + СДТО).</p>'
+      }
+    };
+
+    // 3) применяем тексты
+    const cfg = PAGE_CONTENT[window.PAGE_SLUG] || PAGE_CONTENT.page1;
+    const elTitle    = document.getElementById('page-title');
+    const elSubtitle = document.getElementById('page-subtitle');
+    const elIntro    = document.getElementById('page-intro');
+
+    if (elTitle)    elTitle.textContent = cfg.title;
+    if (elSubtitle) elSubtitle.textContent = cfg.subtitle;
+    if (elIntro)    elIntro.innerHTML   = cfg.introHtml;
+
+    document.title = cfg.title;
+
+    // 4) подсветка текущей вкладки (простая)
+    for (const a of document.querySelectorAll('.pages-nav a')) {
+      const isActive = a.getAttribute('href')?.includes(window.PAGE_SLUG);
+      a.style.fontWeight = isActive ? '600' : '400';
+      a.style.textDecoration = isActive ? 'underline' : 'none';
+    }
+  </script>
+
+  <!-- Ваш основной скрипт -->
+  <script src="js/bcg.js"></script>
 </body>
 </html>
