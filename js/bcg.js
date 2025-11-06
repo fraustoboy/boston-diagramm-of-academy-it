@@ -7,6 +7,9 @@ const GROWTH_SPLIT = 10;   // горизонтальная граница по �
 let products = [];
 let chart;
 
+// Текущая страница (slug) передана из index.html через window.PAGE_SLUG
+const PAGE = (window.PAGE_SLUG || 'page1');
+
 // Удобные селекторы
 const els = {
   form:   () => document.getElementById('productForm'),
@@ -112,6 +115,7 @@ async function loadProducts(){
   const { data, error } = await supabase
     .from('products')
     .select('*')
+    .eq('page_slug', PAGE)
     .order('id', { ascending: true });
   if (error) return logErr('Ошибка загрузки', error);
 
@@ -133,7 +137,7 @@ async function addProduct(){
 
   const { error } = await supabase
     .from('products')
-    .insert([{ name, marketShare, marketGrowth, size }]);
+    .insert([{ name, marketShare, marketGrowth, size, page_slug: PAGE }]);
   if (error) return logErr('Ошибка добавления', error);
 
   els.name().value = '';
@@ -143,15 +147,15 @@ async function addProduct(){
 }
 
 async function deleteProduct(id){
-  const { error } = await supabase.from('products').delete().eq('id', id);
+  const { error } = await supabase.from('products').delete().eq('id', id).eq('page_slug', PAGE);
   if (error) return logErr('Ошибка удаления', error);
 }
 
 // === Realtime ===
 function enableRealtime(){
   supabase
-    .channel('products-changes')
-    .on('postgres_changes', { event:'*', schema:'public', table:'products' }, loadProducts)
+    .channel(`products-changes-${PAGE}`)
+    .on('postgres_changes', { event:'*', schema:'public', table:'products', filter: `page_slug=eq.${PAGE}` }, loadProducts)
     .subscribe();
 }
 
