@@ -16,82 +16,70 @@ const els = {
   name:   () => document.getElementById('productName'),
   share:  () => document.getElementById('marketShare'),
   growth: () => document.getElementById('marketGrowth'),
-  size:   () => document.getElementById('marketSize'),
-
+  size:   () => document.getElementById('productSize'),
+  list:   () => document.getElementById('productsList'),
   canvas: () => document.getElementById('bcgChart'),
-  list:   () => document.getElementById('productList'),
-
-  slug:   () => document.getElementById('page-slug'),
-  title:  () => document.getElementById('page-title'),
-  subttl: () => document.getElementById('page-subtitle'),
-  intro:  () => document.getElementById('intro'),
 };
 
-function logErr(...args){ console.error('[BCG]', ...args); }
-function log(...args){ console.log('[BCG]', ...args); }
-
-// === CRUD заглушки/пример данных ===
-// Здесь могут быть реальные вызовы Supabase/REST; для примера используем локальное хранилище
-function loadProducts(){
-  try {
-    const raw = localStorage.getItem(`bcg-${PAGE}`) || '[]';
-    products = JSON.parse(raw);
-  } catch(e){
-    logErr('loadProducts error', e);
-    products = [];
+// Мини-лог
+function log(msg){
+  let b = document.getElementById('appLog');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'appLog';
+    b.style = 'position:fixed;right:8px;bottom:8px;background:#111;color:#fff;padding:8px 10px;border-radius:8px;font:12px system-ui;z-index:9999;opacity:.9';
+    document.body.appendChild(b);
   }
+  b.textContent = String(msg);
 }
+function logErr(p,e){ console.error(p,e); log(`${p}: ${e?.message || e}`); }
 
-function saveProducts(){
-  try {
-    localStorage.setItem(`bcg-${PAGE}`, JSON.stringify(products));
-  } catch(e){
-    logErr('saveProducts error', e);
-  }
-}
-
-function addProduct(p){
-  products.push({ id: crypto.randomUUID(), ...p });
-  saveProducts(); renderAll();
-}
-
-function deleteProduct(id){
-  products = products.filter(p => p.id !== id);
-  saveProducts(); renderAll();
-}
-
-// === Рисуем квадранты поверх чарта ===
+// === Плагин: квадранты + подписи по центру (логика BCG корректная) ===
 const bcgQuadrants = {
   id: 'bcgQuadrants',
-  afterDraw: (chart, args, opts) => {
-    const { ctx, chartArea } = chart;
-    const { left, right, top, bottom } = chartArea;
-    const midX = chart.scales.x.getPixelForValue(SHARE_SPLIT);
-    const midY = chart.scales.y.getPixelForValue(GROWTH_SPLIT);
+  beforeDraw(chart) {
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea) return;
 
-    ctx.save();
-    // Фон квадрантов
-    ctx.fillStyle = 'rgba(0,0,0,0.02)';
-    ctx.fillRect(left, top, right - left, bottom - top);
+    const x = scales.x, y = scales.y;
+    const xSplit = x.getPixelForValue(SHARE_SPLIT);
+    const ySplit = y.getPixelForValue(GROWTH_SPLIT);
+
+    // Цвета под легенду:
+    const COLOR_STARS   = 'rgba(255, 99, 132, 0.10)';  // розовый
+    const COLOR_COWS    = 'rgba(255, 206, 86, 0.12)';  // жёлтый
+    const COLOR_CHILD   = 'rgba(75, 192, 192, 0.10)';  // бирюзовый
+    const COLOR_DOGS    = 'rgba(201, 203, 207, 0.12)'; // серый
+
+    // Квадранты по правилам:
+    // Верх-лево: высокий рост, низкая доля  → Трудные дети
+    const UL = { x0: chartArea.left,  y0: chartArea.top,    x1: xSplit,          y1: ySplit,           fill: COLOR_CHILD, label: 'Трудные дети' };
+    // Верх-право: высокий рост, высокая доля → Звезды
+    const UR = { x0: xSplit,          y0: chartArea.top,    x1: chartArea.right, y1: ySplit,           fill: COLOR_STARS, label: 'Звезды' };
+    // Низ-право: низкий рост, высокая доля   → Дойные коровы
+    const LR = { x0: xSplit,          y0: ySplit,           x1: chartArea.right, y1: chartArea.bottom, fill: COLOR_COWS,  label: 'Дойные коровы' };
+    // Низ-лево: низкий рост, низкая доля     → Собаки
+    const LL = { x0: chartArea.left,  y0: ySplit,           x1: xSplit,          y1: chartArea.bottom, fill: COLOR_DOGS,  label: 'Собаки' };
+
+    [UL, UR, LR, LL].forEach(q => {
+      ctx.save();
+      ctx.fillStyle = q.fill;
+      ctx.fillRect(q.x0, q.y0, q.x1 - q.x0, q.y1 - q.y0);
+      ctx.restore();
+    });
 
     // Разделительные линии
-    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-    ctx.lineWidth = 1.25;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(xSplit, chartArea.top);    ctx.lineTo(xSplit, chartArea.bottom); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(chartArea.left, ySplit);   ctx.lineTo(chartArea.right, ySplit);  ctx.stroke();
+    ctx.restore();
 
-    // Вертикальная
-    ctx.beginPath(); ctx.moveTo(midX, top); ctx.lineTo(midX, bottom); ctx.stroke();
-    // Горизонтальная
-    ctx.beginPath(); ctx.moveTo(left, midY); ctx.lineTo(right, midY); ctx.stroke();
-
-    // Подписи квадрантов
-    ctx.fillStyle = '#333';
-    ctx.font = '600 12px Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial';
-    const pad = 10;
-    const UL = { x0: left, x1: midX, y0: top,  y1: midY, label: 'Звезды' };
-    const UR = { x0: midX, x1: right, y0: top, y1: midY, label: 'Трудные дети' };
-    const LR = { x0: midX, x1: right, y0: midY, y1: bottom, label: 'Собаки' };
-    const LL = { x0: left, x1: midX, y0: midY, y1: bottom, label: 'Дойные коровы' };
-
+    // Подписи по центрам квадрантов
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const center = q => ({ cx: (q.x0 + q.x1) / 2, cy: (q.y0 + q.y1) / 2 });
@@ -103,13 +91,81 @@ const bcgQuadrants = {
   }
 };
 
+// === Инициализация ===
+document.addEventListener('DOMContentLoaded', () => {
+  if (!window.supabase) { logErr('Supabase не инициализирован', 'проверь <script> в index.html'); return; }
+  wireHandlers();
+  enableRealtime();
+  loadProducts();
+});
+
+// === Обработчики ===
+function wireHandlers(){
+  const form = els.form();
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await addProduct();
+    });
+  }
+}
+
+// === CRUD Supabase ===
+async function loadProducts(){
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('page_slug', PAGE)
+    .order('id', { ascending: true });
+  if (error) return logErr('Ошибка загрузки', error);
+
+  products = data || [];
+  renderList();
+  renderChart();
+  log('Данные загружены');
+}
+
+async function addProduct(){
+  const name = (els.name()?.value || '').trim();
+  const marketShare  = parseFloat(els.share()?.value);   // 0..1
+  const marketGrowth = parseFloat(els.growth()?.value);  // -100..100
+  const size         = parseFloat(els.size()?.value);
+
+  if (!name || isNaN(marketShare) || isNaN(marketGrowth) || isNaN(size)) {
+    return log('Заполни все поля корректно');
+  }
+
+  const { error } = await supabase
+    .from('products')
+    .insert([{ name, marketShare, marketGrowth, size, page_slug: PAGE }]);
+  if (error) return logErr('Ошибка добавления', error);
+
+  els.name().value = '';
+  els.share().value = '';
+  els.growth().value = '';
+  els.size().value = '';
+}
+
+async function deleteProduct(id){
+  const { error } = await supabase.from('products').delete().eq('id', id).eq('page_slug', PAGE);
+  if (error) return logErr('Ошибка удаления', error);
+}
+
+// === Realtime ===
+function enableRealtime(){
+  supabase
+    .channel(`products-changes-${PAGE}`)
+    .on('postgres_changes', { event:'*', schema:'public', table:'products', filter: `page_slug=eq.${PAGE}` }, loadProducts)
+    .subscribe();
+}
+
 // === Рендер списка ===
 function renderList(){
   const box = els.list(); if (!box) return;
   box.innerHTML = '';
   products.forEach(p => {
     const row = document.createElement('div');
-    row.className = 'product-row';
+    row.className = 'product-item';
     row.innerHTML = `
       <span><strong>${p.name}</strong> — доля: ${p.marketShare}, рост: ${p.marketGrowth}%, размер: ${p.size}</span>
       <button class="del" data-id="${p.id}" title="Удалить">❌</button>
@@ -159,51 +215,18 @@ function renderChart(){
         }
       },
       plugins: {
-        // ВАЖНО: надписи видны всегда, без наведения
         legend: { display: false },
-        tooltip: { enabled: false },
-        datalabels: {
-          display: true,
-          align: 'center',
-          color: '#000',
-          font: { size: 12, weight: '600' },
-          formatter: (value, ctx) => {
-            const name = ctx.dataset?.label ?? '';
-            const d = value;
-            return `${name}\n${d.x}, ${d.y}%`;
+        tooltip: {
+          callbacks: {
+            label: (c) => {
+              const d = c.raw;                // { x, y, r, size }
+              const name = c.dataset.label;
+              return `${name}: доля ${d.x}, рост ${d.y}%, размер ${d.size}`;
+            }
           }
         }
       }
     },
-    // Подключаем плагин квадрантов и DataLabels
-    plugins: [bcgQuadrants, ChartDataLabels]
+    plugins: [bcgQuadrants]
   });
 }
-
-// === Рендер всего ===
-function renderAll(){
-  renderList();
-  renderChart();
-}
-
-// === Инициализация ===
-document.addEventListener('DOMContentLoaded', () => {
-  loadProducts();
-  renderAll();
-
-  // Пример обработки формы
-  const form = els.form();
-  if (form) {
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name   = (els.name()?.value || '').trim();
-      const share  = Number(els.share()?.value || 0);
-      const growth = Number(els.growth()?.value || 0);
-      const size   = Number(els.size()?.value || 0);
-      if (!name) return;
-
-      addProduct({ name, marketShare: share, marketGrowth: growth, size });
-      form.reset();
-    });
-  }
-});
