@@ -228,7 +228,7 @@ function renderChart(){
         // ========== ПОСТОЯННЫЕ ПОДПИСИ НА ТОЧКАХ ==========
         datalabels: {
           display: true,
-          align: 'top',
+          align: 'bottom',
           anchor: 'center',
           offset: 4,
           backgroundColor: 'rgba(255, 255, 255, 0.9)',
