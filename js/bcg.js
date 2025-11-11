@@ -224,9 +224,30 @@ function renderChart(){
               return `${name}: доля ${d.x}, рост ${d.y}%, размер ${d.size}`;
             }
           }
+        },
+        // ========== ПОСТОЯННЫЕ ПОДПИСИ НА ТОЧКАХ ==========
+        datalabels: {
+          display: true,
+          align: 'top',
+          anchor: 'center',
+          offset: 4,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          borderRadius: 4,
+          padding: { top: 4, bottom: 4, left: 6, right: 6 },
+          font: {
+            size: 11,
+            weight: '600',
+            family: 'Inter, system-ui, sans-serif'
+          },
+          color: '#333',
+          formatter: (value, context) => {
+            // Отображаем название продукта
+            return context.dataset.label;
+          }
         }
+        // ===================================================
       }
     },
-    plugins: [bcgQuadrants]
+    plugins: [bcgQuadrants, ChartDataLabels]  // Добавили ChartDataLabels
   });
 }
