@@ -241,8 +241,10 @@ function renderChart(){
           },
           color: '#333',
           formatter: (value, context) => {
-            // Отображаем название продукта
-            return context.dataset.label;
+            // Отображаем название продукта и размер выручки
+            const name = context.dataset.label;
+            const size = value.size;
+            return `${name}\n${size} млн`;
           }
         }
         // ===================================================
